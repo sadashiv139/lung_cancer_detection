@@ -81,6 +81,39 @@ def predict_image(img_path: str, weights_path: str = "lung_cancer_model.pth"):
     return pred_class, pred_prob
 
 
+def predict_image_report(img_path: str, weights_path: str = "lung_cancer_model.pth"):
+    device = torch.device(
+        "mps"
+        if torch.backends.mps.is_available()
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+
+    if not os.path.isfile(weights_path):
+        raise FileNotFoundError(
+            f"Model weights file '{weights_path}' not found. "
+            "Make sure you ran train.py and saved the model."
+        )
+
+    model = load_model(weights_path, device)
+    img_tensor = preprocess_image(img_path, device)
+
+    with torch.no_grad():
+        outputs = model(img_tensor)  # [1, num_classes]
+        probs = F.softmax(outputs, dim=1)[0]  # [num_classes]
+        pred_idx = torch.argmax(probs).item()
+
+    probabilities = {CLASSES[i]: float(probs[i].item()) for i in range(len(CLASSES))}
+
+    return {
+        "predicted_class": CLASSES[pred_idx],
+        "confidence": float(probabilities[CLASSES[pred_idx]]),
+        "probabilities": probabilities,
+        "device": str(device),
+    }
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 predict.py path/to/ct_image.jpg")
